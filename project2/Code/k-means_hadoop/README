@@ -1,0 +1,10 @@
+# Requirements
+1. numpy
+2. sklearn
+3. matplotlib
+
+# once hadoop setup is ready run the following command for k-means
+python k-means.py cho.txt 5
+# the integer is number of centroids
+
+# make sure hadoop is in /usr/local/hadoop/bin/

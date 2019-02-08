@@ -1,0 +1,8 @@
+# Requirements
+1. numpy
+2. pandas
+3. sklearn
+4. matplotlib
+
+# execute the following command to execute the program
+python density_based_algo_dbscan.py cho.txt
