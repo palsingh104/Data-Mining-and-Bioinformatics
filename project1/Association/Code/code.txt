@@ -1,0 +1,744 @@
+
+import java.io.*;
+//import java.security.KeyStore.Entry;
+import java.util.*;
+import java.nio.file.*;
+
+public class Association {
+	static LinkedHashMap<Integer, HashSet<String>> hm;
+	static ArrayList<LinkedList<String>> permutations;
+	static HashMap<HashSet<String>, HashSet<String>> headbody = new HashMap<HashSet<String>, HashSet<String>>();
+	static ArrayList<HashMap<HashSet<String>, HashSet<String>>> allrules = new ArrayList<HashMap<HashSet<String>, HashSet<String>>>();
+	static HashMap<HashSet<String>, HashSet<String>> bodyhead = new HashMap<HashSet<String>, HashSet<String>>();
+	static HashMap<HashSet<String>, Integer> itemSupport = new HashMap<HashSet<String>, Integer>();
+	static ArrayList<HashMap<HashSet<String>, Integer>> itemSupportAl = new ArrayList<HashMap<HashSet<String>, Integer>>();
+
+	/**
+	 * @param args
+	 */
+
+	public static String readFileAsString(String fileName) throws Exception {
+		String data = "";
+		data = new String(Files.readAllBytes(Paths.get(fileName)));
+		return data;
+	}
+
+	public static HashSet<String> getItem(HashSet<String> hs1,
+			HashSet<String> hs2, int len) {
+		int common = len - 1;
+		int count = 0;
+		HashSet<String> result = new HashSet<String>();
+		if (hs1.size() != len || hs2.size() != len)
+			return null;
+		else {
+			for (String s : hs1) {
+				if (hs2.contains(s)) {
+
+					count++;
+				}
+			}
+			if (count == common) {
+				result.addAll(hs1);
+				result.addAll(hs2);
+				return result;
+			} else
+				return null;
+		}
+
+	}
+
+	public static void getCount(HashMap<HashSet<String>, Integer> input) {
+		int count = 0;
+		boolean no_match = false;
+		for (Map.Entry<HashSet<String>, Integer> entry : input.entrySet()) {
+			HashSet<String> left = entry.getKey();
+
+			for (Map.Entry<Integer, HashSet<String>> records : hm.entrySet()) {
+				HashSet<String> right = records.getValue();
+				no_match = false;
+				for (String s : left) {
+					if (!right.contains(s)) {
+						no_match = true;
+						break;
+					}
+				}
+				if (!no_match)
+					entry.setValue(entry.getValue() + 1);
+			}
+		}
+	}
+
+	public static int getCount(HashSet<String> input) {
+		int count = 0;
+
+		HashSet<String> left = input;
+
+		for (Map.Entry<Integer, HashSet<String>> records : hm.entrySet()) {
+			HashSet<String> right = records.getValue();
+
+			if (right.containsAll(left)) {
+				count++;
+			}
+
+		}
+		return count;
+	}
+
+	public static LinkedHashMap<Integer, HashSet<String>> createRecords(
+			String data) {
+		StringTokenizer st = new StringTokenizer(data);
+		HashSet<String> temp_list = new HashSet<String>();
+		int recordID = 0;
+		int gIndex = 0;
+		hm = new LinkedHashMap<Integer, HashSet<String>>();
+		HashSet<String> hs = new HashSet<String>();
+		while (st.hasMoreTokens()) {
+			String nextToken = st.nextToken();
+			if (nextToken.equalsIgnoreCase("Up") || nextToken.equalsIgnoreCase("Down")) {
+				gIndex++;
+				String token = "G" + gIndex + "_" + nextToken;
+				hs.add(token);
+				if (!temp_list.contains(token))
+					itemSupport.put(new HashSet<String>(Arrays.asList(token)),
+							0);
+				temp_list.add(token);
+			} else {
+				if (nextToken.contains("ALL") || nextToken.contains("AML")||nextToken.contains("all")||nextToken.contains("All")||nextToken.contains("aml")) {
+					hs.add(nextToken);
+					if (!temp_list.contains(nextToken))
+						itemSupport.put(
+								new HashSet<String>(Arrays.asList(nextToken)),
+								0);
+					temp_list.add(nextToken);
+				} else {
+					String ntoken = st.nextToken();
+					hs.add(nextToken + " " + ntoken);
+					if (!temp_list.contains(nextToken + " " + ntoken))
+						itemSupport.put(
+								new HashSet<String>(Arrays.asList(nextToken
+										+ " " + ntoken)), 0);
+					temp_list.add(nextToken + " " + ntoken);
+
+				}
+				// System.out.println("Record ID="+
+				// recordID+" gIndex="+gIndex+" next token="+nextToken);
+				recordID++;
+				gIndex = 0;
+				hm.put(recordID, new HashSet<String>(hs));
+				hs.clear();
+
+			}
+
+		}
+
+		return hm;
+	}
+
+	public static void pruneItems(int support) {
+		HashMap<HashSet<String>, Integer> tempHM = new HashMap<HashSet<String>, Integer>();
+		for (Map.Entry<HashSet<String>, Integer> record : itemSupport
+				.entrySet()) {
+			if (record.getValue() >= support)
+				tempHM.put(record.getKey(), record.getValue());
+		}
+		itemSupport.clear();
+		if (tempHM != null)
+			itemSupport = (HashMap<HashSet<String>, Integer>) tempHM.clone();
+
+	}
+
+	public static void upgrade() {
+		int curLen = -1;
+		ArrayList<ArrayList<String>> al = new ArrayList<ArrayList<String>>();
+		HashMap<HashSet<String>, Integer> tempHM = new HashMap<HashSet<String>, Integer>();
+		for (Map.Entry<HashSet<String>, Integer> record : itemSupport
+				.entrySet()) {
+			if (curLen == -1)
+				curLen = record.getKey().size();
+			// for(String s: record.getKey())
+			al.add(new ArrayList(Arrays.asList(record.getKey().toArray())));
+			// if(record.getValue()>=support)
+			// tempHM.put(record.getKey(),record.getValue());
+		}
+
+		for (int i = 0; i < al.size(); i++) {
+			HashSet<String> hs_top = new HashSet<String>();
+			ArrayList<String> temp_al = al.get(i);
+			for (String s : temp_al) {
+				hs_top.add(s);
+			}
+			for (int j = i + 1; j < al.size(); j++) {
+				HashSet<String> hs_bottom = new HashSet<String>(al.get(j));
+				for (String s : al.get(j)) {
+					hs_bottom.add(s);
+				}
+				// System.out.println("i="+i+"  j="+j);
+				HashSet<String> result = getItem(hs_top, hs_bottom, curLen);
+				if (result != null)
+					tempHM.put(result, 0);
+			}
+		}
+		itemSupport.clear();
+		itemSupport = (HashMap<HashSet<String>, Integer>) tempHM.clone();
+
+	}
+
+	public static ArrayList<HashMap<HashSet<String>, HashSet<String>>> template1() {
+		HashSet<String> temp_hm = new HashSet<String>();
+		HashMap<HashSet<String>, HashSet<String>> result = new HashMap<HashSet<String>, HashSet<String>>();
+		ArrayList<HashMap<HashSet<String>, HashSet<String>>> resultal = new ArrayList<HashMap<HashSet<String>, HashSet<String>>>();
+		System.out.println("Parameter for Template 1:");
+		Scanner sc = new Scanner(System.in);
+		System.out.println("Enter parameter 1(RULE/HEAD/BODY)");
+		String p1 = sc.next();
+		System.out.println("Enter parameter 2(ANY/NUMBER/NONE)");
+		String p2 = sc.next();
+		System.out.println("Enter parameter 3(Item list followed by #)");
+		HashSet<String> p3 = new HashSet<String>();
+		while (true) {
+			String token = sc.next();
+			if (token.equalsIgnoreCase("Cancer"))
+				continue;
+			if (token.equalsIgnoreCase("Breast")||token.equalsIgnoreCase("Colon"))
+				token=token+" "+"Cancer";
+			if (token.equals("#"))
+				break;
+			p3.add(token);
+
+		}
+		// String p3 = sc.next();
+		for (HashMap<HashSet<String>, HashSet<String>> rules : allrules) {
+			headbody.clear();
+			headbody.putAll(rules);
+
+			for (Map.Entry<HashSet<String>, HashSet<String>> entry : headbody
+					.entrySet()) {
+				HashSet<String> key = entry.getKey();
+				HashSet<String> value = entry.getValue();
+				boolean none = true;
+				int count = 0;
+				boolean repeat = false;
+				if (p1.toLowerCase().equals("rule")) {
+
+					for (String token : p3) {
+						if (key.contains(token) || value.contains(token)) {
+							count++;
+							none = false;
+							if (p2.toLowerCase().equals("any") && !repeat) {
+								result.put(new HashSet<String>(key),
+										new HashSet<String>(value));
+								resultal.add(new HashMap<HashSet<String>, HashSet<String>>(
+										result));
+								result.clear();
+								System.out.println(key + "=>" + value);
+								repeat = true;
+							}
+							// break;
+						}
+
+					}
+					if (p2.toLowerCase().equals("none") && none) {
+						result.put(new HashSet<String>(key),
+								new HashSet<String>(value));
+						resultal.add(new HashMap<HashSet<String>, HashSet<String>>(
+								result));
+						result.clear();
+						//System.out.println(key + "=>" + value);
+					} else if (!p2.toLowerCase().equals("any")
+							&& !p2.toLowerCase().equals("none")) {
+						int num = Integer.parseInt(p2);
+						if (num == count) {
+							result.put(new HashSet<String>(key),
+									new HashSet<String>(value));
+							resultal.add(new HashMap<HashSet<String>, HashSet<String>>(
+									result));
+							result.clear();
+							//System.out.println(key + "=>" + value);
+						}
+					}
+				}
+
+				if (p1.toLowerCase().equals("head")) {
+
+					for (String token : p3) {
+						if (key.contains(token)) {
+							count++;
+							none = false;
+							if (p2.toLowerCase().equals("any") && !repeat) {
+								result.put(new HashSet<String>(key),
+										new HashSet<String>(value));
+								resultal.add(new HashMap<HashSet<String>, HashSet<String>>(
+										result));
+								result.clear();
+								//System.out.println(key + "=>" + value);
+								repeat = true;
+							}
+							// break;
+						}
+
+					}
+					if (p2.toLowerCase().equals("none") && none)
+
+					{
+						result.put(new HashSet<String>(key),
+								new HashSet<String>(value));
+						resultal.add(new HashMap<HashSet<String>, HashSet<String>>(
+								result));
+						result.clear();
+						//System.out.println(key + "=>" + value);
+					}
+
+					else if (!p2.toLowerCase().equals("any")
+							&& !p2.toLowerCase().equals("none")) {
+						int num = Integer.parseInt(p2);
+						if (num == count) {
+							result.put(new HashSet<String>(key),
+									new HashSet<String>(value));
+							resultal.add(new HashMap<HashSet<String>, HashSet<String>>(
+									result));
+							result.clear();
+							//System.out.println(key + "=>" + value);
+						}
+					}
+				}
+
+				if (p1.toLowerCase().equals("body")) {
+
+					for (String token : p3) {
+						if (value.contains(token)) {
+							count++;
+							none = false;
+							if (p2.toLowerCase().equals("any") && !repeat) {
+								result.put(new HashSet<String>(key),
+										new HashSet<String>(value));
+								resultal.add(new HashMap<HashSet<String>, HashSet<String>>(
+										result));
+								result.clear();
+								//System.out.println(key + "=>" + value);
+								repeat = true;
+							}
+							// break;
+						}
+
+					}
+					if (p2.toLowerCase().equals("none") && none) {
+						result.put(new HashSet<String>(key),
+								new HashSet<String>(value));
+						resultal.add(new HashMap<HashSet<String>, HashSet<String>>(
+								result));
+						result.clear();
+						//System.out.println(key + "=>" + value);
+					} else if (!p2.toLowerCase().equals("any")
+							&& !p2.toLowerCase().equals("none")) {
+						int num = Integer.parseInt(p2);
+						if (num == count) {
+							result.put(new HashSet<String>(key),
+									new HashSet<String>(value));
+							resultal.add(new HashMap<HashSet<String>, HashSet<String>>(
+									result));
+							result.clear();
+							//System.out.println(key + "=>" + value);
+						}
+					}
+				}
+
+			}
+		}
+		System.out.println("Rules generated by templeate 1:");
+		//System.out.println(resultal);
+		displayRules(resultal);
+		System.out.println("Template1 result length is:" + resultal.size());
+		return resultal;
+
+	}
+
+	public static ArrayList<HashMap<HashSet<String>, HashSet<String>>> template2() {
+		HashSet<String> temp_hm = new HashSet<String>();
+		HashMap<HashSet<String>, HashSet<String>> result = new HashMap<HashSet<String>, HashSet<String>>();
+		// ArrayList<HashMap<HashSet<String>,HashSet<String>>> resultal = new
+		// ArrayList<HashMap<HashSet<String>,HashSet<String>>>();
+		System.out.println("Parameter for Template 2:");
+		Scanner sc = new Scanner(System.in);
+		System.out.println("Enter parameter 1(HEAD/BODY/RULE)");
+		String p1 = sc.next();
+		System.out.println("Enter parameter 2(Number)");
+		int n = sc.nextInt();
+
+		ArrayList<HashMap<HashSet<String>, HashSet<String>>> resultal = new ArrayList<HashMap<HashSet<String>, HashSet<String>>>();
+		// String p3 = sc.next();
+		for (HashMap<HashSet<String>, HashSet<String>> rules : allrules) {
+			headbody.clear();
+			headbody.putAll(rules);
+			for (Map.Entry<HashSet<String>, HashSet<String>> entry : headbody
+					.entrySet()) {
+				HashSet<String> key = entry.getKey();
+				HashSet<String> value = entry.getValue();
+				if (p1.toLowerCase().equals("rule")) {
+					if (key.size() + value.size() >= n) {
+						result.put(new HashSet<String>(key),
+								new HashSet<String>(value));
+						resultal.add(new HashMap<HashSet<String>, HashSet<String>>(
+								result));
+						result.clear();
+					}
+				}
+
+				if (p1.toLowerCase().equals("head")) {
+					if (key.size() >= n) {
+						result.put(new HashSet<String>(key),
+								new HashSet<String>(value));
+						resultal.add(new HashMap<HashSet<String>, HashSet<String>>(
+								result));
+						result.clear();
+					}
+				}
+
+				if (p1.toLowerCase().equals("body")) {
+					if (value.size() >= n) {
+						result.put(new HashSet<String>(key),
+								new HashSet<String>(value));
+						resultal.add(new HashMap<HashSet<String>, HashSet<String>>(
+								result));
+						result.clear();
+					}
+				}
+
+			}
+
+		}
+		System.out.println("Rules generted by template 2:");
+		displayRules(resultal);
+		System.out.println("Template 2 result length is:" + resultal.size());
+		return resultal;
+
+	}
+
+	public static ArrayList<HashMap<HashSet<String>, HashSet<String>>> template3() {
+		HashSet<String> temp_hm = new HashSet<String>();
+		HashMap<HashSet<String>, HashSet<String>> result = new HashMap<HashSet<String>, HashSet<String>>();
+		ArrayList<HashMap<HashSet<String>, HashSet<String>>> resultal = new ArrayList<HashMap<HashSet<String>, HashSet<String>>>();
+		ArrayList<HashMap<HashSet<String>, HashSet<String>>> result1 = new ArrayList<HashMap<HashSet<String>, HashSet<String>>>();
+		ArrayList<HashMap<HashSet<String>, HashSet<String>>> result2 = new ArrayList<HashMap<HashSet<String>, HashSet<String>>>();
+		System.out.println("Parameter for Template 3:");
+		Scanner sc = new Scanner(System.in);
+		System.out.println("Enter template numbers");
+		int t1 = sc.nextInt();
+		int t2 = sc.nextInt();
+		System.out.println("Enter and/or relation");
+		String andor = sc.next();
+
+		// String p3 = sc.next();
+
+		if (t1 == 1 && t2 == 1) {
+			result1 = template1();
+			result2 = template1();
+		}
+
+		else if (t1 == 2 && t2 == 2) {
+			result1 = template2();
+			result2 = template2();
+		}
+
+		else {
+			result1 = template1();
+			result2 = template2();
+		}
+
+		if (andor.toLowerCase().equals("and")) {
+			for (HashMap<HashSet<String>, HashSet<String>> hml : result1) {
+				for (Map.Entry<HashSet<String>, HashSet<String>> entry : hml
+						.entrySet()) {
+					HashSet<String> key = entry.getKey();
+					HashSet<String> value = entry.getValue();
+
+					for (HashMap<HashSet<String>, HashSet<String>> hm2 : result2) {
+						for (Map.Entry<HashSet<String>, HashSet<String>> entry2 : hm2
+								.entrySet()) {
+
+							if (entry2.getKey().equals(key)
+									&& entry2.getValue().equals(value)) {
+								result.put(key, value);
+								resultal.add(result);
+							}
+						}
+
+					}
+				}
+			}
+		} else {
+
+			for (HashMap<HashSet<String>, HashSet<String>> hml : result1) {
+				for (Map.Entry<HashSet<String>, HashSet<String>> entry : hml
+						.entrySet()) {
+					HashSet<String> key = entry.getKey();
+					HashSet<String> value = entry.getValue();
+
+					for (Iterator<HashMap<HashSet<String>, HashSet<String>>> itr = result2
+							.iterator(); itr.hasNext();) {
+						HashMap<HashSet<String>, HashSet<String>> hm2 = itr
+								.next();
+						for (Map.Entry<HashSet<String>, HashSet<String>> entry2 : hm2
+								.entrySet()) {
+
+							if (entry2.getKey().equals(key)
+									&& entry2.getValue().equals(value)) {
+								itr.remove();
+							}
+						}
+					}
+
+				}
+			}
+
+			resultal.addAll(result1);
+			resultal.addAll(result2);
+		}
+
+		
+		System.out.println("Rules generted by template3:");
+		displayRules(resultal);
+		System.out.println("Result for template 3 has length:"
+				+ resultal.size());
+		return resultal;
+
+	}
+
+	public static ArrayList<LinkedList<String>> createPermutations(
+			HashMap<HashSet<String>, Integer> p_itemSupport) {
+		ArrayList<ArrayList<String>> al = new ArrayList<ArrayList<String>>();
+		ArrayList<LinkedList<String>> result = new ArrayList<LinkedList<String>>();
+		for (Map.Entry<HashSet<String>, Integer> record : p_itemSupport
+				.entrySet()) {
+
+			al.add(new ArrayList(Arrays.asList(record.getKey().toArray())));
+
+		}
+		ArrayList<String> items = al.get(0);
+
+		ArrayList<LinkedList<String>> rules = new ArrayList<LinkedList<String>>();
+		ArrayList<String> units = new ArrayList<String>();
+
+		units.add(items.get(0));
+		items.remove(0);
+		rules.add(new LinkedList<String>(units));
+		units.clear();
+		for (String item : items) {
+			ArrayList<LinkedList<String>> temp_rules = new ArrayList<LinkedList<String>>();
+			for (LinkedList<String> rule : rules) {
+
+				for (int i = 0; i <= rule.size(); i++) {
+					LinkedList<String> temp_rule = (LinkedList<String>) rule
+							.clone();
+					temp_rule.add(i, item);
+					temp_rules.add((LinkedList<String>) temp_rule.clone());
+
+				}
+			}
+			rules.clear();
+			rules = (ArrayList<LinkedList<String>>) temp_rules.clone();
+			temp_rules.clear();
+
+		}
+		result = (ArrayList<LinkedList<String>>) rules.clone();
+		return result;
+
+	}
+
+	public static HashMap<HashSet<String>, HashSet<String>> createRules(
+			ArrayList<LinkedList<String>> p_permutations) {
+		// HashMap<HashSet<String>,HashSet<HashSet<String>>> rules = new
+		// HashMap<HashSet<String>,HashSet<HashSet<String>>>();
+		HashMap<HashSet<String>, HashSet<String>> rules = new HashMap<HashSet<String>, HashSet<String>>();
+
+		for (LinkedList<String> permutation : p_permutations) {
+			String[] tokens = new String[permutation.size()];// (String[])(permutation.toArray());
+			int index = 0;
+			for (String s : permutation) {
+				tokens[index] = new String(s);
+				index++;
+			}
+			for (int ptr = 0; ptr < tokens.length - 1; ptr++) {
+				int left_ind = 0;
+				int right_ind = ptr + 1;
+				HashSet<String> left = new HashSet<String>();
+				HashSet<String> right = new HashSet<String>();
+				while (left_ind <= ptr) {
+					left.add(tokens[left_ind]);
+					left_ind++;
+
+				}
+				while (right_ind < tokens.length) {
+					right.add(tokens[right_ind]);
+					right_ind++;
+
+				}
+				// HashSet<HashSet<String>> rightResult = rules.get(left);
+				HashSet<String> rightResult = rules.get(left);
+				if (rightResult == null) {
+					// rightResult = new HashSet<HashSet<String>>();
+					rightResult = new HashSet<String>();
+					rightResult.addAll(right);
+					rules.put(left, rightResult);
+				} else
+					rightResult.addAll(right);
+			}
+		}
+
+		//System.out.println(rules);
+		// System.out.println(bodyhead);
+		return rules;
+	}
+
+	public static void pruneRules(int confidence) {
+		for (Iterator<HashMap<HashSet<String>, HashSet<String>>> itr = allrules
+				.iterator(); itr.hasNext();) {
+			HashMap<HashSet<String>, HashSet<String>> unitrule = itr.next();
+			HashSet<String> fullrule = new HashSet<String>();
+			HashSet<String> key = null;
+			// itemSupport.clear();
+			for (Map.Entry<HashSet<String>, HashSet<String>> output : unitrule
+					.entrySet()) {
+				key = output.getKey();
+				fullrule.addAll(output.getKey());
+				fullrule.addAll(output.getValue());
+
+			}
+
+			float nume = (float) getCount(fullrule);
+			float deno = (float) getCount(key);
+			float ans = nume / deno * 100;
+			if (ans < confidence) {
+				itr.remove();
+			}
+
+		}
+	}
+
+	public static void createAllRules() {
+		for (HashMap<HashSet<String>, Integer> set : itemSupportAl) {
+			for (Map.Entry<HashSet<String>, Integer> hm_temp : set.entrySet()) {
+				HashMap<HashSet<String>, Integer> temp_set = new HashMap<HashSet<String>, Integer>();
+				HashSet<String> keys = hm_temp.getKey();
+
+				temp_set.put(hm_temp.getKey(), hm_temp.getValue());
+				HashMap<HashSet<String>, HashSet<String>> rules = createRules(createPermutations(temp_set));
+				for (Map.Entry<HashSet<String>, HashSet<String>> rule : rules
+						.entrySet()) {
+					HashMap<HashSet<String>, HashSet<String>> new_rule = new HashMap<HashSet<String>, HashSet<String>>();
+					new_rule.put(rule.getKey(), rule.getValue());
+					allrules.add(new_rule);
+				}
+			}
+
+			// System.out.println(set);
+		}
+
+	}
+
+	public static void fillItemSupport(int support) {
+		int count = 0;
+		HashMap<HashSet<String>, Integer> itemSupportl = null;// = new
+																// HashMap<HashSet<String>,Integer>();
+		while (itemSupport.size() >= 1) {
+			count++;
+
+			getCount(itemSupport);
+			pruneItems(support);
+			if (itemSupport.size() == 0)
+				break;
+			if (count > 1)
+				itemSupportAl.add(new HashMap<HashSet<String>, Integer>(
+						itemSupport));
+			System.out.println("Length is :" + itemSupport.size());
+			// if(itemSupport.size()==1)
+			// break;
+			itemSupportl = new HashMap<HashSet<String>, Integer>(itemSupport);
+			upgrade();
+		}
+
+		itemSupport.clear();
+		itemSupport = (HashMap<HashSet<String>, Integer>) itemSupportl.clone();
+
+	}
+
+	public static void displayRules(ArrayList<HashMap<HashSet<String>, HashSet<String>>> p_allrules)
+	{
+		//System.out.println("Rules are:");
+		for(HashMap<HashSet<String>,HashSet<String>> hm_rule:p_allrules)
+		{
+			for(Map.Entry<HashSet<String>, HashSet<String>> entry_rule: hm_rule.entrySet())
+			{
+				
+					System.out.println(entry_rule.getKey()+"=>"+entry_rule.getValue());
+			}
+		}
+	}
+	public static void main(String[] args) {
+		// TODO Auto-generated method stub
+		Scanner sc = new Scanner(System.in);
+		System.out.println("Enter Support count");
+		int support = sc.nextInt();
+		System.out.println("Enter Confidence count");
+		int confidence = sc.nextInt();
+		
+		String data = "";
+		try {
+
+			data = readFileAsString("F:\\data mining\\data.txt");
+			// System.out.println(data);
+
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		hm = createRecords(data);
+
+		// //////////////////////////////////////////
+		fillItemSupport(support);
+		// //////////////////////////////////////////////////////////////////////////
+		if (itemSupport.size() == 0) {
+			System.out.println("No rules are possible");
+			return;
+		}
+
+		createAllRules();
+
+		headbody.clear();
+
+		// ///////////////////////////////////////////////
+		pruneRules(confidence);
+		// ///////////////////////////////////////
+		
+		
+		System.out.println("Rules for given support and confidence:");
+		displayRules(allrules);
+		System.out.println("Number of rules generated: for given support and confidence" + allrules.size());
+		
+		boolean flag_continue=true;
+		while(flag_continue)
+		{
+		System.out.println("Enter template number");
+		int choice = sc.nextInt();
+		switch (choice) {
+		case 1:
+			System.out.println(template1().size());
+			break;
+		case 2:
+			System.out.println(template2().size());
+			break;
+		case 3:
+			System.out.println(template3().size());
+			break;
+		}
+		System.out.println("Do you want to continue?(y/n)");
+		String yn = sc.next();
+		
+		if(yn.equals("n"))
+			flag_continue = false;
+		}
+		// template3();
+
+	}
+
+}

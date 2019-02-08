@@ -1,0 +1,14 @@
+# python version: 3.6.x
+
+# required packages
+1. numpy
+2. pandas
+3. plotly
+4. sklearn
+
+# install packages by simply executing the following command
+pip install -r requirements.txt
+
+# once the packages are installed, run the following command.
+# the main method requires the file path
+python main.py pca_a.txt
